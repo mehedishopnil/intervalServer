@@ -9,17 +9,17 @@ const port = process.env.PORT || 5000;
 
 // Middleware setup
 app.use(cors({
-     origin: ['http://localhost:5000', 'https://your-vercel-domain.vercel.app'],
-     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-     credentials: true,
-   }));
-   
+  origin: ['http://localhost:3000', 'https://your-vercel-domain.vercel.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+}));
+
 app.use(express.json()); // Parse JSON payloads
 
-// MongoDB connection URI (move credentials to .env for security)
-const uri = "mongodb+srv://IntervalServer:dIO0ppukF9Lfh0wJ@cluster0.sju0f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+// MongoDB connection URI
+const uri = `mongodb+srv://IntervalServer:${process.env.DB_PASS}@cluster0.sju0f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+// Create a MongoClient with options
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -31,16 +31,13 @@ const client = new MongoClient(uri, {
 // Database and collection variables
 let db, ResortDataCollection;
 
-// Run MongoDB connection logic
-async function connectToDatabase() {
-  try {
+// Lazy connection function
+async function getDatabase() {
+  if (!db) {
     await client.connect();
     db = client.db("Interval");
     ResortDataCollection = db.collection("AllResorts");
-
-    console.log("Connected to MongoDB and collections initialized.");
-  } catch (error) {
-    console.error("Error connecting to MongoDB:", error);
+    console.log("MongoDB connected lazily.");
   }
 }
 
@@ -50,19 +47,19 @@ app.get('/', (req, res) => {
   res.send('Interval Server is running');
 });
 
-// Route to fetch all resort data without pagination
+// Fetch all resort data
 app.get('/resort-data', async (req, res) => {
   try {
+    await getDatabase(); // Ensure the database is connected
     const resorts = await ResortDataCollection.find().toArray();
     res.status(200).send(resorts);
   } catch (error) {
-    console.error("Error fetching all resort data:", error);
+    console.error("Error fetching resort data:", error);
     res.status(500).send({ message: "Internal Server Error" });
   }
 });
 
 // Start the server
-app.listen(port, async () => {
-  await connectToDatabase();
+app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
