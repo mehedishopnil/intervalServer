@@ -8,7 +8,12 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware setup
-app.use(cors()); // Enable CORS for all requests
+app.use(cors({
+     origin: ['http://localhost:5000', 'https://your-vercel-domain.vercel.app'],
+     methods: ['GET', 'POST', 'PUT', 'DELETE'],
+     credentials: true,
+   }));
+   
 app.use(express.json()); // Parse JSON payloads
 
 // MongoDB connection URI (move credentials to .env for security)
