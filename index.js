@@ -24,14 +24,14 @@ const client = new MongoClient(uri, {
 });
 
 // Database and collection variables
-let db, allResortDataCollection;
+let db, ResortDataCollection;
 
 // Run MongoDB connection logic
 async function connectToDatabase() {
   try {
     await client.connect();
     db = client.db("Interval");
-    allResortDataCollection = db.collection("AllResorts");
+    ResortDataCollection = db.collection("AllResorts");
 
     console.log("Connected to MongoDB and collections initialized.");
   } catch (error) {
@@ -46,9 +46,9 @@ app.get('/', (req, res) => {
 });
 
 // Route to fetch all resort data without pagination
-app.get('/all-resorts', async (req, res) => {
+app.get('/resort-data', async (req, res) => {
   try {
-    const resorts = await allResortDataCollection.find().toArray();
+    const resorts = await ResortDataCollection.find().toArray();
     res.status(200).send(resorts);
   } catch (error) {
     console.error("Error fetching all resort data:", error);
