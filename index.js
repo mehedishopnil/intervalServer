@@ -9,7 +9,6 @@ const port = process.env.PORT || 5000;
 
 // Middleware setup
 app.use(cors());
-
 app.use(express.json()); // Parse JSON payloads
 
 // MongoDB connection URI
@@ -46,121 +45,58 @@ app.get('/', (req, res) => {
   res.send('Interval Server is running');
 });
 
-
-
-// Fetch all resort data
+// Fetch all users
 app.get('/users', async (req, res) => {
   try {
-    await getDatabase(); // Ensure the database is connected
-    const resorts = await UserDataCollection.find().toArray();
-    res.status(200).send(resorts);
+    await getDatabase();
+    const users = await UserDataCollection.find().toArray();
+    res.status(200).send(users);
   } catch (error) {
-    console.error("Error fetching resort data:", error);
+    console.error("Error fetching users data:", error);
     res.status(500).send({ message: "Internal Server Error" });
   }
 });
 
+// Check if user exists by email
+app.get('/users', async (req, res) => {
+  const email = req.query.email;
+  if (!email) {
+    return res.status(400).send({ message: "Email query parameter is required" });
+  }
 
+  try {
+    await getDatabase();
+    const user = await UserDataCollection.findOne({ email });
+    res.status(200).send(user ? [user] : []); // Return an array for compatibility
+  } catch (error) {
+    console.error("Error checking user email:", error);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
 
-// Add a new user
-app.post("/users", async (req, res) => {
-     try {
-       const { name, email } = req.body;
-   
-       if (!name || !email) {
-         return res.status(400).send({ message: "Name and email are required" });
-       }
-   
-       // Check if user with the same email already exists
-       const existingUser = await UserDataCollection.findOne({ email });
-       if (existingUser) {
-         return res
-           .status(409)
-           .send({ message: "User with this email already exists" });
-       }
-   
-       console.log(req.body); // Debugging
-       const result = await UserDataCollection.insertOne(req.body);
-   
-       res.status(201).send({
-         message: "User successfully added",
-         userId: result.insertedId,
-       });
-     } catch (error) {
-       console.error("Error adding user data:", error.message);
-       res.status(500).send({ message: "Internal Server Error" });
-     }
-   });
-   
+// Create a new user
+app.post('/users', async (req, res) => {
+  const { name, userId, email, membership, telephone } = req.body;
 
+  if (!email || !name) {
+    return res.status(400).send({ message: "Name and email are required" });
+  }
 
-   // Update user role to admin
-app.patch("/update-user", async (req, res) => {
-     try {
-       const { email, isAdmin } = req.body;
-   
-       if (!email || typeof isAdmin !== "boolean") {
-         return res
-           .status(400)
-           .send({ message: "Email and isAdmin status are required" });
-       }
-   
-       const result = await UserDataCollection.updateOne(
-         { email },
-         { $set: { isAdmin } }
-       );
-   
-       if (result.matchedCount === 0) {
-         return res
-           .status(404)
-           .send({ message: "User not found or role not updated" });
-       }
-   
-       res.status(200).send({ message: "User role updated successfully" });
-     } catch (error) {
-       console.error("Error updating user role:", error.message);
-       res.status(500).send({ message: "Internal Server Error" });
-     }
-   });
-   
-
-
-
-   // Update or add user info (any incoming data)
-   app.patch("/update-user-info", async (req, res) => {
-     const { email, age, securityDeposit, idNumber } = req.body;
-
-     try {
-       const result = await UserDataCollection.updateOne(
-         { email: email },
-         { $set: { age, securityDeposit, idNumber } }
-       );
-
-       if (result.modifiedCount === 0) {
-         return res.status(404).json({
-           success: false,
-           message: "User not found or information not updated.",
-         });
-       }
-
-       res.json({
-         success: true,
-         message: "User information updated successfully.",
-       });
-     } catch (error) {
-       console.error("Error updating user info:", error);
-       res
-         .status(500)         
-         .json({ success: false, message: "Internal Server Error" });
-     }
-   });
-
-
+  try {
+    await getDatabase();
+    const newUser = { name, userId, email, membership, telephone };
+    const result = await UserDataCollection.insertOne(newUser);
+    res.status(201).send(result);
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
 
 // Fetch all resort data
 app.get('/resort-data', async (req, res) => {
   try {
-    await getDatabase(); // Ensure the database is connected
+    await getDatabase();
     const resorts = await ResortDataCollection.find().toArray();
     res.status(200).send(resorts);
   } catch (error) {
