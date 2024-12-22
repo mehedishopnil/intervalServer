@@ -11,6 +11,15 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json()); // Parse JSON payloads
 
+// Middleware to log requests
+app.use((req, res, next) => {
+  console.log(`Incoming ${req.method} request to ${req.url}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log("Request body:", req.body);
+  }
+  next();
+});
+
 // MongoDB connection URI
 const uri = `mongodb+srv://IntervalServer:${process.env.DB_PASS}@cluster0.sju0f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -29,13 +38,16 @@ let db, ResortDataCollection, UserDataCollection;
 // Lazy connection function
 async function getDatabase() {
   if (!db) {
-    await client.connect();
-
-    db = client.db("Interval");
-    ResortDataCollection = db.collection("AllResorts");
-    UserDataCollection = db.collection("users");
-
-    console.log("MongoDB connected lazily.");
+    try {
+      await client.connect();
+      db = client.db("Interval");
+      ResortDataCollection = db.collection("AllResorts");
+      UserDataCollection = db.collection("users");
+      console.log("MongoDB connected lazily.");
+    } catch (error) {
+      console.error("Error connecting to MongoDB:", error);
+      throw new Error("Database connection failed");
+    }
   }
 }
 
@@ -46,7 +58,7 @@ app.get('/', (req, res) => {
 });
 
 // Fetch all users
-app.get('/users', async (req, res) => {
+app.get('/all-users', async (req, res) => {
   try {
     await getDatabase();
     const users = await UserDataCollection.find().toArray();
@@ -57,39 +69,53 @@ app.get('/users', async (req, res) => {
   }
 });
 
-// Check if user exists by email
-app.get('/users', async (req, res) => {
-  const email = req.query.email;
-  if (!email) {
-    return res.status(400).send({ message: "Email query parameter is required" });
-  }
-
+// Posting Users data to MongoDB database
+app.post("/users", async (req, res) => {
   try {
+    const { name, email } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).send({ message: "Name and email are required" });
+    }
+
     await getDatabase();
-    const user = await UserDataCollection.findOne({ email });
-    res.status(200).send(user ? [user] : []); // Return an array for compatibility
+
+    // Check if user with the same email already exists
+    const existingUser = await UserDataCollection.findOne({ email });
+    if (existingUser) {
+      return res.status(409).send({ message: "User with this email already exists" });
+    }
+
+    console.log(req.body); // Logs posted user data for debugging (optional)
+    const result = await UserDataCollection.insertOne(req.body);
+
+    res.status(201).send({
+      message: "User successfully added",
+      userId: result.insertedId,
+    });
   } catch (error) {
-    console.error("Error checking user email:", error);
-    res.status(500).send({ message: "Internal Server Error" });
+    console.error("Error adding user data:", error.message);
+    res.status(500).send({ message: "Internal Server Error", error: error.message });
   }
 });
 
-// Create a new user
-app.post('/users', async (req, res) => {
-  const { name, userId, email, membership, telephone } = req.body;
+// GET endpoint to fetch user data by email
+app.get("/users/email", async (req, res) => {
+  const { email } = req.query;
 
-  if (!email || !name) {
-    return res.status(400).send({ message: "Name and email are required" });
+  if (!email) {
+    return res.status(400).json({ error: "Email query parameter is required" });
   }
 
   try {
-    await getDatabase();
-    const newUser = { name, userId, email, membership, telephone };
-    const result = await UserDataCollection.insertOne(newUser);
-    res.status(201).send(result);
+    const user = await UserDataCollection.findOne({ email: email });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(user);
   } catch (error) {
-    console.error("Error creating user:", error);
-    res.status(500).send({ message: "Internal Server Error" });
+    console.error("Error fetching user data:", error);
+    res.status(500).send({ message: "Internal Server Error", error: error.message });
   }
 });
 
@@ -103,6 +129,18 @@ app.get('/resort-data', async (req, res) => {
     console.error("Error fetching resort data:", error);
     res.status(500).send({ message: "Internal Server Error" });
   }
+});
+
+// Catch-all route for undefined routes
+app.all("*", (req, res) => {
+  res.status(404).send({ message: "Route not found" });
+});
+
+// Handle graceful shutdown of MongoDB connection
+process.on("SIGINT", () => {
+  client.close();
+  console.log("MongoDB connection closed");
+  process.exit();
 });
 
 // Start the server
