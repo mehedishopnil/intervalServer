@@ -119,6 +119,46 @@ app.get("/users/email", async (req, res) => {
   }
 });
 
+
+// Add this route to handle posting resort data
+app.post('/add-resort', async (req, res) => {
+  try {
+    const { img, img2, img3, resortName, location, symbol, country, continent, description } = req.body;
+
+    // Validate required fields
+    if (!img || !img2 || !img3 || !resortName || !location || !symbol || !country || !description) {
+      return res.status(400).send({ message: "All fields are required" });
+    }
+
+    await getDatabase();
+
+    // Insert the resort data into the MongoDB collection
+    const newResort = {
+      img,
+      img2,
+      img3,
+      resortName,
+      location,
+      symbol,
+      country,
+      continent,
+      description,
+      createdAt: new Date(),
+    };
+
+    const result = await ResortDataCollection.insertOne(newResort);
+
+    res.status(201).send({
+      message: "Resort data successfully added",
+      resortId: result.insertedId,
+    });
+  } catch (error) {
+    console.error("Error adding resort data:", error.message);
+    res.status(500).send({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
 // Fetch all resort data
 app.get('/resort-data', async (req, res) => {
   try {
