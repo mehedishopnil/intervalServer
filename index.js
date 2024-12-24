@@ -123,27 +123,19 @@ app.get("/users/email", async (req, res) => {
 // Add this route to handle posting resort data
 app.post('/add-resort', async (req, res) => {
   try {
-    const { img, img2, img3, resortName, location, symbol, country, continent, description } = req.body;
+    const resortData = req.body;
 
-    // Validate required fields
-    if (!img || !img2 || !img3 || !resortName || !location || !symbol || !country || !description) {
-      return res.status(400).send({ message: "All fields are required" });
+    // Validate that the body is not empty
+    if (!resortData || Object.keys(resortData).length === 0) {
+      return res.status(400).send({ message: "Resort data cannot be empty" });
     }
 
     await getDatabase();
 
     // Insert the resort data into the MongoDB collection
     const newResort = {
-      img,
-      img2,
-      img3,
-      resortName,
-      location,
-      symbol,
-      country,
-      continent,
-      description,
-      createdAt: new Date(),
+      ...resortData, // Spread the incoming data
+      createdAt: new Date(), // Add a timestamp for when the data is added
     };
 
     const result = await ResortDataCollection.insertOne(newResort);
@@ -157,6 +149,7 @@ app.post('/add-resort', async (req, res) => {
     res.status(500).send({ message: "Internal Server Error", error: error.message });
   }
 });
+
 
 
 // Fetch all resort data
